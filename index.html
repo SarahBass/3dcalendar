@@ -7,8 +7,8 @@
     <style>
       :root {
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: radial-gradient(circle at top, #111, #050505 60%);
-        color: #e4e4e4;
+        background: linear-gradient(180deg, #ffeef1 0%, #ffd3dc 45%, #ffbccb 100%);
+        color: #1b3d91;
       }
 
       body {
@@ -40,13 +40,14 @@
         font-size: 0.95rem;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.85);
+        color: #c41230;
+        text-shadow: 0 2px 4px rgba(255, 255, 255, 0.6);
       }
 
       .overlay small {
         font-size: 0.75rem;
         letter-spacing: 0.15em;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(27, 61, 145, 0.75);
       }
     </style>
   </head>
@@ -73,7 +74,7 @@
 
       const container = document.getElementById('scene-container');
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x040404);
+      scene.background = new THREE.Color(0xfff4f6);
 
       const camera = new THREE.PerspectiveCamera(
         45,
@@ -109,6 +110,17 @@
       const WEEKS_VISIBLE = 5;
       const CUBE_SIZE = 1.4;
       const GAP = 0.4;
+      const palette = {
+        baseRed: '#e5243f',
+        warmWhite: '#fff7f2',
+        accentBlue: '#1c2c84',
+        weekendPink: '#ffccd7',
+        weekdaysRed: '#d92032',
+        weekendLabel: '#f06a8b',
+        todaySunshine: '#ffe066',
+        subtleOutline: '#f3a0b8',
+      };
+
       const calendarRig = new THREE.Group();
       scene.add(calendarRig);
       const calendarGroup = new THREE.Group();
@@ -124,7 +136,7 @@
         ctx.fillText(label, size / 2, size * 0.6);
       }
 
-      function createDayTexture({ label, active, highlight }) {
+      function createDayTexture({ label, active, highlight, weekend }) {
         const size = 512;
         const canvas = Object.assign(document.createElement('canvas'), {
           width: size,
@@ -132,8 +144,14 @@
         });
         const ctx = canvas.getContext('2d');
 
-        const background = highlight ? '#f37435' : active ? '#141414' : '#1b1b1b';
-        const border = highlight ? '#ffd7c2' : active ? '#2c2c2c' : '#2a2a2a';
+        const background = highlight
+          ? palette.todaySunshine
+          : weekend
+          ? palette.weekendPink
+          : active
+          ? palette.warmWhite
+          : '#f1d9d7';
+        const border = highlight ? '#f9c74f' : palette.subtleOutline;
 
         ctx.fillStyle = background;
         ctx.strokeStyle = border;
@@ -146,8 +164,8 @@
           size - ctx.lineWidth
         );
 
-        ctx.fillStyle = highlight ? '#080808' : '#f2f2f2';
-        ctx.font = `bold ${size * 0.5}px 'Inter', 'Segoe UI', sans-serif`;
+        ctx.fillStyle = highlight ? palette.baseRed : palette.accentBlue;
+        ctx.font = `bold ${size * 0.48}px 'Inter', 'Segoe UI', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         padTextureText(ctx, label, size);
@@ -155,17 +173,17 @@
         return new THREE.CanvasTexture(canvas);
       }
 
-      function createWeekdayTexture(label) {
+      function createWeekdayTexture(label, weekend) {
         const size = 512;
         const canvas = Object.assign(document.createElement('canvas'), {
           width: size,
           height: size,
         });
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#0c0c0c';
+        ctx.fillStyle = weekend ? palette.weekendLabel : palette.weekdaysRed;
         ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = '#e0e0e0';
-        ctx.font = `600 ${size * 0.35}px 'Inter', 'Segoe UI', sans-serif`;
+        ctx.fillStyle = '#fff7f2';
+        ctx.font = `700 ${size * 0.36}px 'Inter', 'Segoe UI', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(label, size / 2, size / 2);
@@ -192,6 +210,7 @@
             date,
             inMonth: date.getMonth() === today.getMonth(),
             isToday: date.getTime() === today.getTime(),
+            weekend: date.getDay() === 0 || date.getDay() === 6,
           });
         }
         return cells;
@@ -214,13 +233,14 @@
             label: cell.date.getDate().toString(),
             active: cell.inMonth,
             highlight: cell.isToday,
+            weekend: cell.weekend,
           });
 
           const material = new THREE.MeshStandardMaterial({
             map: texture,
-            color: cell.inMonth ? 0xffffff : 0x888888,
-            metalness: 0.1,
-            roughness: 0.35,
+            color: 0xffffff,
+            metalness: 0.05,
+            roughness: 0.6,
           });
 
           const cube = new THREE.Mesh(baseGeometry, material);
@@ -236,7 +256,7 @@
 
         // Weekday labels sit slightly above cubes
         weekdays.forEach((day, idx) => {
-          const spriteMap = createWeekdayTexture(day);
+          const spriteMap = createWeekdayTexture(day, idx === 0 || idx === 6);
           const material = new THREE.MeshBasicMaterial({ map: spriteMap, transparent: true });
           const plane = new THREE.Mesh(new THREE.PlaneGeometry(CUBE_SIZE, CUBE_SIZE * 0.4), material);
           plane.position.set(
