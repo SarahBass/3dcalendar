@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>3D Calendar • Three.js</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600&family=Nunito:wght@500;700&display=swap');
+
       :root {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: linear-gradient(180deg, #ffe8cc 0%, #ffc98e 45%, #f6a55a 100%);
+        font-family: 'Baloo 2', 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top, #ffe6c9 0%, #ffc278 45%, #f7974c 100%);
         color: #1b3d91;
       }
 
@@ -16,11 +18,13 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
+        background: radial-gradient(circle at top, #ffe6c9 0%, #ffc278 45%, #f7974c 100%);
       }
 
       #scene-container {
         flex: 1;
         position: relative;
+        box-shadow: inset 0 40px 120px rgba(255, 255, 255, 0.45);
       }
 
       canvas {
@@ -87,6 +91,8 @@
       renderer.setClearColor(0x000000, 0);
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       container.appendChild(renderer.domElement);
 
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -102,6 +108,8 @@
 
       const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
       dirLight.position.set(6, 12, 10);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.set(2048, 2048);
       scene.add(dirLight);
 
       const monthLabel = document.getElementById('month-label');
@@ -111,26 +119,46 @@
       const CUBE_SIZE = 1.4;
       const GAP = 0.4;
       const palette = {
-        baseRed: '#e5243f',
-        warmWhite: '#fff7f2',
+        baseRed: '#ea2b2f',
+        studRed: '#ef383c',
+        warmWhite: '#fffaf3',
+        ivory: '#fff3df',
         accentBlue: '#1c2c84',
-        weekendPink: '#ffccd7',
+        numberBlue: '#3243c4',
+        weekendPink: '#ffe1e8',
         weekdaysRed: '#d92032',
         weekendLabel: '#f06a8b',
         todaySunshine: '#ffe066',
-        subtleOutline: '#f3a0b8',
+        subtleOutline: '#f5b3c4',
+        bowRed: '#ff304a',
+        kittyWhite: '#fff7fb',
+        kittyNose: '#ffcb6b',
       };
 
       const calendarRig = new THREE.Group();
       scene.add(calendarRig);
+      const ground = new THREE.Mesh(
+        new THREE.CircleGeometry(26, 64),
+        new THREE.MeshStandardMaterial({ color: '#f0ad72', roughness: 1, metalness: 0 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
       const calendarGroup = new THREE.Group();
       const weekdayGroup = new THREE.Group();
+      const decorGroup = new THREE.Group();
+      calendarRig.add(decorGroup);
       calendarRig.add(calendarGroup);
       calendarRig.add(weekdayGroup);
 
-      const baseGeometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+      calendarGroup.position.y = CUBE_SIZE * 0.85;
+      weekdayGroup.position.y = CUBE_SIZE * 0.85;
+
+      const TILE_DEPTH = CUBE_SIZE * 0.55;
+      const baseGeometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, TILE_DEPTH);
 
       const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      let layoutState = null;
 
       function padTextureText(ctx, label, size) {
         ctx.fillText(label, size / 2, size * 0.6);
@@ -146,16 +174,17 @@
 
         const background = highlight
           ? palette.todaySunshine
-          : weekend
+          : weekend && active
           ? palette.weekendPink
           : active
           ? palette.warmWhite
-          : '#f1d9d7';
+          : palette.ivory;
         const border = highlight ? '#f9c74f' : palette.subtleOutline;
+        const textColor = highlight ? palette.baseRed : weekend ? palette.weekendLabel : palette.numberBlue;
 
         ctx.fillStyle = background;
         ctx.strokeStyle = border;
-        ctx.lineWidth = size * 0.03;
+        ctx.lineWidth = size * 0.04;
         ctx.fillRect(0, 0, size, size);
         ctx.strokeRect(
           ctx.lineWidth / 2,
@@ -164,11 +193,21 @@
           size - ctx.lineWidth
         );
 
-        ctx.fillStyle = highlight ? palette.baseRed : palette.accentBlue;
-        ctx.font = `bold ${size * 0.48}px 'Inter', 'Segoe UI', sans-serif`;
+        ctx.fillStyle = textColor;
+        ctx.font = `600 ${size * 0.5}px 'Baloo 2', 'Nunito', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = size * 0.04;
         padTextureText(ctx, label, size);
+        ctx.shadowBlur = 0;
+
+        if (weekend && !highlight) {
+          ctx.fillStyle = 'rgba(255, 48, 74, 0.18)';
+          ctx.beginPath();
+          ctx.arc(size * 0.82, size * 0.2, size * 0.07, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         return new THREE.CanvasTexture(canvas);
       }
@@ -182,12 +221,395 @@
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = weekend ? palette.weekendLabel : palette.weekdaysRed;
         ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = '#fff7f2';
-        ctx.font = `700 ${size * 0.36}px 'Inter', 'Segoe UI', sans-serif`;
+        ctx.fillStyle = palette.warmWhite;
+        ctx.font = `700 ${size * 0.34}px 'Baloo 2', 'Nunito', sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.shadowColor = 'rgba(0,0,0,0.18)';
+        ctx.shadowBlur = size * 0.04;
         ctx.fillText(label, size / 2, size / 2);
         return new THREE.CanvasTexture(canvas);
+      }
+
+      function drawApple(ctx, x, y, radius) {
+        ctx.fillStyle = '#ff3b30';
+        ctx.strokeStyle = '#ce0f1d';
+        ctx.lineWidth = radius * 0.25;
+        ctx.beginPath();
+        ctx.arc(x - radius * 0.3, y, radius, 0, Math.PI * 2);
+        ctx.arc(x + radius * 0.3, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(x, y + radius * 0.05, radius * 0.95, radius * 0.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#3e9c44';
+        ctx.beginPath();
+        ctx.ellipse(x - radius * 0.2, y - radius * 0.85, radius * 0.4, radius * 0.5, 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(x + radius * 0.2, y - radius * 0.9, radius * 0.3, radius * 0.45, -0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawBow(ctx, x, y, size) {
+        ctx.fillStyle = palette.bowRed;
+        ctx.strokeStyle = '#a01120';
+        ctx.lineWidth = size * 0.12;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.bezierCurveTo(x - size, y - size * 0.4, x - size * 1.1, y + size * 0.5, x - size * 0.2, y + size * 0.1);
+        ctx.bezierCurveTo(x - size * 1.1, y + size * 0.6, x - size * 0.3, y + size * 1, x, y + size * 0.3);
+        ctx.bezierCurveTo(x + size * 0.3, y + size * 1, x + size * 1.1, y + size * 0.6, x + size * 0.2, y + size * 0.1);
+        ctx.bezierCurveTo(x + size * 1.1, y + size * 0.5, x + size, y - size * 0.4, x, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.fillStyle = '#ff7b8c';
+        ctx.arc(x, y + size * 0.2, size * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      function drawKittyFace(ctx, x, y, size) {
+        ctx.fillStyle = palette.kittyWhite;
+        ctx.beginPath();
+        ctx.ellipse(x, y, size, size * 0.85, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(x - size * 0.6, y - size * 0.2);
+        ctx.lineTo(x - size * 0.3, y - size * 0.9);
+        ctx.lineTo(x - size * 0.05, y - size * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x + size * 0.6, y - size * 0.2);
+        ctx.lineTo(x + size * 0.3, y - size * 0.9);
+        ctx.lineTo(x + size * 0.05, y - size * 0.2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = palette.accentBlue;
+        ctx.beginPath();
+        ctx.arc(x - size * 0.3, y - size * 0.05, size * 0.12, 0, Math.PI * 2);
+        ctx.arc(x + size * 0.3, y - size * 0.05, size * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = palette.kittyNose;
+        ctx.beginPath();
+        ctx.ellipse(x, y + size * 0.05, size * 0.18, size * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#d9c7cf';
+        ctx.lineWidth = size * 0.06;
+        ctx.beginPath();
+        ctx.moveTo(x - size * 0.7, y + size * 0.1);
+        ctx.lineTo(x - size * 0.35, y + size * 0.05);
+        ctx.moveTo(x + size * 0.7, y + size * 0.1);
+        ctx.lineTo(x + size * 0.35, y + size * 0.05);
+        ctx.stroke();
+
+        drawBow(ctx, x + size * 0.55, y - size * 0.45, size * 0.45);
+      }
+
+      function createStripePanelTexture() {
+        const canvas = Object.assign(document.createElement('canvas'), {
+          width: 512,
+          height: 1024,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = palette.baseRed;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const stripeHeight = canvas.height / 6;
+        for (let i = 0; i < 3; i += 1) {
+          const y = stripeHeight * (1 + i * 1.8);
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, y, canvas.width, stripeHeight);
+          drawApple(ctx, canvas.width / 2, y + stripeHeight * 0.55, stripeHeight * 0.4);
+        }
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function createBottomPanelTexture() {
+        const canvas = Object.assign(document.createElement('canvas'), {
+          width: 2048,
+          height: 640,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = palette.baseRed;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        drawKittyFace(ctx, canvas.width * 0.1, canvas.height * 0.55, canvas.height * 0.35);
+        ctx.fillStyle = '#fff';
+        ctx.font = `700 ${canvas.height * 0.35}px 'Baloo 2', 'Nunito', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('HELLO KITTY', canvas.width * 0.55, canvas.height * 0.55);
+        drawBow(ctx, canvas.width * 0.88, canvas.height * 0.5, canvas.height * 0.22);
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function createEventBrickTexture({ label, accent, icon }) {
+        const size = 512;
+        const canvas = Object.assign(document.createElement('canvas'), {
+          width: size,
+          height: size,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = size * 0.1;
+        ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, size - ctx.lineWidth, size - ctx.lineWidth);
+        if (icon === 'apple') {
+          drawApple(ctx, size * 0.2, size * 0.5, size * 0.18);
+        } else if (icon === 'bow') {
+          drawBow(ctx, size * 0.2, size * 0.35, size * 0.25);
+        }
+        ctx.fillStyle = palette.numberBlue;
+        ctx.font = `700 ${size * 0.22}px 'Nunito', 'Baloo 2', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label.toUpperCase(), size * 0.62, size * 0.55);
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function createFlipCardTexture() {
+        const size = 1024;
+        const canvas = Object.assign(document.createElement('canvas'), {
+          width: size,
+          height: size * 1.2,
+        });
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = palette.warmWhite;
+        ctx.strokeStyle = '#d9d9d9';
+        ctx.lineWidth = size * 0.04;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeRect(
+          ctx.lineWidth / 2,
+          ctx.lineWidth / 2,
+          canvas.width - ctx.lineWidth,
+          canvas.height - ctx.lineWidth
+        );
+        ctx.fillStyle = palette.numberBlue;
+        ctx.font = `700 ${size * 0.7}px 'Baloo 2', 'Nunito', sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('1', canvas.width / 2, canvas.height * 0.45);
+        ctx.fillStyle = palette.accentBlue;
+        ctx.font = `600 ${size * 0.22}px 'Nunito', sans-serif`;
+        ctx.fillText('JANUARY', canvas.width / 2, canvas.height * 0.75);
+        return new THREE.CanvasTexture(canvas);
+      }
+
+      function buildDecor(width, height) {
+        decorGroup.clear();
+        const paddingX = CUBE_SIZE * 0.9;
+        const paddingY = CUBE_SIZE * 1.4;
+        const baseDepth = CUBE_SIZE * 1.4;
+        const frontFace = baseDepth / 2;
+        const baseWidth = width + paddingX * 2;
+        const baseHeight = height + paddingY;
+
+        const blockMaterial = new THREE.MeshStandardMaterial({
+          color: palette.baseRed,
+          roughness: 0.45,
+          metalness: 0.08,
+        });
+
+        const baseBlock = new THREE.Mesh(
+          new THREE.BoxGeometry(baseWidth, baseHeight, baseDepth),
+          blockMaterial
+        );
+        baseBlock.castShadow = true;
+        baseBlock.receiveShadow = true;
+        decorGroup.add(baseBlock);
+
+        const topCapMaterial = new THREE.MeshStandardMaterial({ color: '#f54d52', roughness: 0.4 });
+        const topCap = new THREE.Mesh(
+          new THREE.BoxGeometry(baseWidth, CUBE_SIZE * 0.55, baseDepth * 0.94),
+          topCapMaterial
+        );
+        topCap.position.y = baseHeight / 2 + CUBE_SIZE * 0.3;
+        topCap.castShadow = true;
+        topCap.receiveShadow = true;
+        decorGroup.add(topCap);
+
+        const studGeometry = new THREE.CylinderGeometry(
+          CUBE_SIZE * 0.27,
+          CUBE_SIZE * 0.27,
+          CUBE_SIZE * 0.28,
+          32
+        );
+        const studMaterial = new THREE.MeshStandardMaterial({
+          color: palette.studRed,
+          roughness: 0.25,
+          metalness: 0.1,
+        });
+        const studRows = 2;
+        const studCols = 4;
+        for (let r = 0; r < studRows; r += 1) {
+          for (let c = 0; c < studCols; c += 1) {
+            const stud = new THREE.Mesh(studGeometry, studMaterial);
+            stud.position.set(
+              -baseWidth / 2 + CUBE_SIZE * 0.9 + c * CUBE_SIZE * 0.95,
+              baseHeight / 2 + CUBE_SIZE * 0.6,
+              -CUBE_SIZE * 0.25 + r * CUBE_SIZE * 0.55
+            );
+            stud.castShadow = true;
+            stud.receiveShadow = true;
+            decorGroup.add(stud);
+          }
+        }
+
+        const stripeTexture = createStripePanelTexture();
+        const stripePlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(CUBE_SIZE * 1.15, height * 0.96),
+          new THREE.MeshBasicMaterial({ map: stripeTexture, transparent: true, side: THREE.DoubleSide })
+        );
+        stripePlane.position.set(
+          -width / 2 - CUBE_SIZE * 0.35,
+          CUBE_SIZE * 0.6,
+          frontFace + 0.01
+        );
+        decorGroup.add(stripePlane);
+
+        const bottomTexture = createBottomPanelTexture();
+        const bottomPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(baseWidth * 0.9, CUBE_SIZE * 1.6),
+          new THREE.MeshBasicMaterial({ map: bottomTexture, transparent: true, side: THREE.DoubleSide })
+        );
+        bottomPlane.position.set(0, -baseHeight / 2 + CUBE_SIZE * 0.9, frontFace + 0.01);
+        decorGroup.add(bottomPlane);
+
+        const eventSpecs = [
+          { label: 'Birthday', accent: '#ffb7d5', icon: 'apple' },
+          { label: 'Travel', accent: '#c4e1ff', icon: 'bow' },
+        ];
+        eventSpecs.forEach((spec, idx) => {
+          const tex = createEventBrickTexture(spec);
+          const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(CUBE_SIZE * 1.8, CUBE_SIZE * 1.1),
+            new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+          );
+          plane.position.set(
+            -width / 2 + CUBE_SIZE * 2.2 + idx * CUBE_SIZE * 3,
+            -height / 2 + CUBE_SIZE * 0.6,
+            frontFace + 0.02
+          );
+          decorGroup.add(plane);
+        });
+
+        const flipTexture = createFlipCardTexture();
+        const flipMaterial = new THREE.MeshBasicMaterial({ map: flipTexture, side: THREE.DoubleSide });
+        const flipCard = new THREE.Mesh(new THREE.PlaneGeometry(CUBE_SIZE * 1.6, CUBE_SIZE * 2.2), flipMaterial);
+        flipCard.position.set(baseWidth / 2 - CUBE_SIZE * 1.7, baseHeight / 2 + CUBE_SIZE * 1.7, 0.25);
+        flipCard.rotation.y = Math.PI * -0.04;
+        decorGroup.add(flipCard);
+
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(CUBE_SIZE * 0.45, CUBE_SIZE * 0.05, 14, 28),
+          new THREE.MeshStandardMaterial({ color: '#d2d2d2', metalness: 0.8, roughness: 0.2 })
+        );
+        ring.rotation.x = Math.PI / 2;
+        ring.position.copy(flipCard.position).add(new THREE.Vector3(0, CUBE_SIZE * 0.6, -0.1));
+        ring.castShadow = true;
+        ring.receiveShadow = true;
+        decorGroup.add(ring);
+
+        const weekdayBar = new THREE.Mesh(
+          new THREE.PlaneGeometry(width, CUBE_SIZE * 0.85),
+          new THREE.MeshBasicMaterial({ color: palette.baseRed, side: THREE.DoubleSide })
+        );
+        weekdayBar.position.set(0, height / 2 + CUBE_SIZE * 0.35, frontFace - TILE_DEPTH);
+        decorGroup.add(weekdayBar);
+
+        const kittyGroup = new THREE.Group();
+        kittyGroup.position.set(baseWidth / 2 - CUBE_SIZE * 0.8, baseHeight / 2 + CUBE_SIZE * 1.4, -CUBE_SIZE * 0.35);
+
+        const kittyMaterial = new THREE.MeshStandardMaterial({
+          color: palette.kittyWhite,
+          roughness: 0.35,
+          metalness: 0.05,
+        });
+        const head = new THREE.Mesh(new THREE.SphereGeometry(CUBE_SIZE * 0.55, 32, 32), kittyMaterial);
+        head.scale.y = 0.85;
+        head.position.y = CUBE_SIZE * 0.2;
+        kittyGroup.add(head);
+
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(CUBE_SIZE * 0.65, CUBE_SIZE * 0.6, CUBE_SIZE * 0.4),
+          new THREE.MeshStandardMaterial({ color: palette.accentBlue, metalness: 0.05, roughness: 0.5 })
+        );
+        body.position.set(0, -CUBE_SIZE * 0.2, 0);
+        kittyGroup.add(body);
+
+        const nose = new THREE.Mesh(
+          new THREE.SphereGeometry(CUBE_SIZE * 0.08, 16, 16),
+          new THREE.MeshStandardMaterial({ color: palette.kittyNose })
+        );
+        nose.position.set(0, CUBE_SIZE * 0.25, CUBE_SIZE * 0.45);
+        kittyGroup.add(nose);
+
+        const eyeGeometry = new THREE.SphereGeometry(CUBE_SIZE * 0.07, 16, 16);
+        const eyeMaterial = new THREE.MeshStandardMaterial({ color: palette.accentBlue, roughness: 0.3 });
+        const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        leftEye.scale.y = 1.35;
+        rightEye.scale.y = 1.35;
+        leftEye.position.set(-CUBE_SIZE * 0.23, CUBE_SIZE * 0.28, CUBE_SIZE * 0.48);
+        rightEye.position.set(CUBE_SIZE * 0.23, CUBE_SIZE * 0.28, CUBE_SIZE * 0.48);
+        kittyGroup.add(leftEye, rightEye);
+
+        const whiskerGeometry = new THREE.BoxGeometry(CUBE_SIZE * 0.42, CUBE_SIZE * 0.02, CUBE_SIZE * 0.02);
+        const whiskerMaterial = new THREE.MeshStandardMaterial({ color: '#d7cdd3', roughness: 0.6 });
+        for (let i = 0; i < 2; i += 1) {
+          const whisker = new THREE.Mesh(whiskerGeometry, whiskerMaterial);
+          whisker.position.set(-CUBE_SIZE * 0.42, CUBE_SIZE * (0.18 - i * 0.08), CUBE_SIZE * 0.35);
+          whisker.rotation.z = THREE.MathUtils.degToRad(i === 0 ? -5 : 8);
+          kittyGroup.add(whisker);
+          const mirror = whisker.clone();
+          mirror.position.x *= -1;
+          mirror.rotation.z *= -1;
+          kittyGroup.add(mirror);
+        }
+
+        const bow = new THREE.Mesh(
+          new THREE.TorusGeometry(CUBE_SIZE * 0.25, CUBE_SIZE * 0.09, 16, 32),
+          new THREE.MeshStandardMaterial({ color: palette.bowRed, metalness: 0.2, roughness: 0.35 })
+        );
+        bow.rotation.y = Math.PI / 2;
+        bow.position.set(CUBE_SIZE * 0.35, CUBE_SIZE * 0.55, 0);
+        kittyGroup.add(bow);
+
+        const earGeometry = new THREE.ConeGeometry(CUBE_SIZE * 0.18, CUBE_SIZE * 0.3, 16);
+        const leftEar = new THREE.Mesh(earGeometry, kittyMaterial);
+        const rightEar = new THREE.Mesh(earGeometry, kittyMaterial);
+        leftEar.rotation.z = Math.PI * 0.9;
+        rightEar.rotation.z = Math.PI * -0.9;
+        leftEar.position.set(-CUBE_SIZE * 0.3, CUBE_SIZE * 0.6, -CUBE_SIZE * 0.1);
+        rightEar.position.set(CUBE_SIZE * 0.3, CUBE_SIZE * 0.6, -CUBE_SIZE * 0.1);
+        kittyGroup.add(leftEar, rightEar);
+
+        kittyGroup.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        decorGroup.add(kittyGroup);
+
+        ground.position.y = -baseHeight / 2 - CUBE_SIZE * 0.15;
+
+        return {
+          frontFace,
+          width,
+          height,
+          baseWidth,
+          baseHeight,
+          baseDepth,
+        };
       }
 
       function getCalendarCells(baseDate = new Date()) {
@@ -223,6 +645,14 @@
         const cells = getCalendarCells(baseDate);
         const totalWidth = DAYS_PER_WEEK * (CUBE_SIZE + GAP);
         const totalHeight = WEEKS_VISIBLE * (CUBE_SIZE + GAP);
+
+        if (!layoutState || layoutState.width !== totalWidth || layoutState.height !== totalHeight) {
+          layoutState = buildDecor(totalWidth, totalHeight);
+        }
+
+        const frontFace = layoutState.frontFace;
+        calendarGroup.position.z = frontFace - TILE_DEPTH / 2 + 0.02;
+        weekdayGroup.position.z = frontFace + 0.04;
         const startX = -totalWidth / 2 + (CUBE_SIZE + GAP) / 2;
         const startY = totalHeight / 2 - (CUBE_SIZE + GAP) / 2;
 
