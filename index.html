@@ -118,18 +118,6 @@
 
       const baseGeometry = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
 
-      const floor = new THREE.Mesh(
-        new THREE.PlaneGeometry(16, 12),
-        new THREE.MeshStandardMaterial({
-          color: 0x080808,
-          metalness: 0.2,
-          roughness: 0.8,
-        })
-      );
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = -CUBE_SIZE;
-      scene.add(floor);
-
       const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
       function padTextureText(ctx, label, size) {
