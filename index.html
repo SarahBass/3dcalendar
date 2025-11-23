@@ -130,11 +130,7 @@
       floor.position.y = -CUBE_SIZE;
       scene.add(floor);
 
-      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-      function toMondayIndex(day) {
-        return (day + 6) % 7; // convert Sunday(0) to 6, Monday(1) -> 0
-      }
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
       function padTextureText(ctx, label, size) {
         ctx.fillText(label, size / 2, size * 0.6);
@@ -191,7 +187,7 @@
       function getCalendarCells(baseDate = new Date()) {
         const today = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
         const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        const startOffset = toMondayIndex(firstOfMonth.getDay());
+        const startOffset = firstOfMonth.getDay();
         const gridStart = new Date(firstOfMonth);
         gridStart.setDate(firstOfMonth.getDate() - startOffset);
 

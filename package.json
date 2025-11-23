@@ -1,0 +1,24 @@
+{
+  "name": "3dcalendar",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "live-server --port=12345 --open=index.html",
+    "start": "npm run dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justinbass/3dcalendar.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/justinbass/3dcalendar/issues"
+  },
+  "homepage": "https://github.com/justinbass/3dcalendar#readme",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
